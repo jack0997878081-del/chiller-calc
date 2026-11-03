@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chiller Load Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#eef2f4; --surface:#ffffff; --ink:#12263a; --muted:#5b6b7a; --line:#d3dce3;
+  --cool:#0a7ea4; --heat:#c8453a; --soft:#e2eef3;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1a24; --surface:#162734; --ink:#e6eef3; --muted:#93a5b4; --line:#27394a;
+    --cool:#4cc3e8; --heat:#ff7a6b; --soft:#17303f; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1a24; --surface:#162734; --ink:#e6eef3; --muted:#93a5b4; --line:#27394a;
+  --cool:#4cc3e8; --heat:#ff7a6b; --soft:#17303f; color-scheme:dark;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --surface:#162734; } }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "IBM Plex Sans Thai",system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:20px;font-weight:600;margin:8px 0 2px}
+h2{font-size:16px;font-weight:600;margin:0 0 12px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;overflow:hidden}
+.hero div{padding:16px}
+.hero div+div{border-left:1px solid var(--line);background:var(--soft)}
+.hero .v{font-size:34px;line-height:1.1;margin-top:4px}
+.hero .l{font-size:13px;color:var(--muted)}
+.heat{color:var(--heat)} .cool{color:var(--cool)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid .full{grid-column:1/-1}
+label{display:block;font-size:13px;color:var(--muted)}
+input,select{width:100%;margin-top:4px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--cool);outline-offset:1px}
+button{font:inherit;font-weight:500;border:0;border-radius:6px;padding:11px 14px;cursor:pointer;background:var(--cool);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.pri{color:#06202b}}
+button.ghost{background:transparent;color:var(--cool);border:1px solid var(--line)}
+button.x{background:transparent;color:var(--muted);padding:4px 8px;font-size:18px}
+.row{display:flex;gap:8px;margin-top:12px}
+.row button{flex:1}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--muted);font-size:13px}
+.empty{color:var(--muted);text-align:center;padding:8px 0}
+dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:8px 12px}
+dt{color:var(--muted)} dd{margin:0;text-align:right}
+.big{font-size:18px}
+.note{font-size:12px;color:var(--muted);margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>คำนวณโหลดชิลเลอร์</h1>
+  <p class="sub">เพิ่มห้อง ดูภาระความเย็นรวม แล้วเลือกขนาดชิลเลอร์</p>
+
+  <section class="card hero" aria-live="polite">
+    <div><div class="l">โหลดออกแบบ</div><div class="v num heat" id="hTR">0.0</div><div class="l">TR</div></div>
+    <div><div class="l">ชิลเลอร์ที่เลือก</div><div class="v num cool" id="hCh">–</div><div class="l">TR</div></div>
+  </section>
+
+  <section class="card">
+    <h2>เพิ่มห้อง</h2>
+    <div class="grid">
+      <label class="full">ชื่อห้อง<input id="name" placeholder="เช่น ห้องประชุม"></label>
+      <label>พื้นที่ (ตร.ม.)<input id="area" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label>พื้นที่กระจก (ตร.ม.)<input id="glass" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label>จำนวนคน<input id="people" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label>ไฟแสงสว่าง (W)<input id="light" type="number" inputmode="decimal" min="0" step="any"></label>
+      <label class="full">อุปกรณ์ไฟฟ้า (W)<input id="equip" type="number" inputmode="decimal" min="0" step="any"></label>
+    </div>
+    <div class="row">
+      <button class="pri" id="add">เพิ่มห้อง</button>
+      <button class="ghost" id="demo">ใส่ข้อมูลตัวอย่าง</button>
+    </div>
+    <p id="err" class="note heat" role="alert" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>รายการห้อง</h2>
+    <div class="scroll" id="list"></div>
+  </section>
+
+  <section class="card">
+    <h2>ตั้งค่า</h2>
+    <div class="grid">
+      <label>Diversity factor<input id="div" type="number" inputmode="decimal" min="0.1" max="1" step="0.05" value="0.8"></label>
+      <label>ΔT น้ำเย็น (°F)<input id="dt" type="number" inputmode="decimal" min="1" step="any" value="10"></label>
+      <label class="full">ชนิดชิลเลอร์
+        <select id="type"><option value="0.65">Water-cooled (0.65 kW/TR)</option><option value="1.1">Air-cooled (1.10 kW/TR)</option></select>
+      </label>
+      <label>แรงดัน (V)<input id="volt" type="number" inputmode="decimal" min="1" step="any" value="380"></label>
+      <label>Power factor<input id="pf" type="number" inputmode="decimal" min="0.1" max="1" step="0.01" value="0.85"></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>ผลการคำนวณ</h2>
+    <dl id="res"></dl>
+    <p class="note">สูตรเป็น Rule of Thumb สำหรับการเรียนรู้ ไม่ใช่การออกแบบจริงตามมาตรฐาน ASHRAE</p>
+  </section>
+</main>
+
+<script>
+/* ค่าคงที่เดียวกับโปรแกรมภาษา C */
+const K = {BTU_TR:12000, W_BTU:3.41, AREA:100, GLASS:250, PERSON:600, FRESH:1.10, MARGIN:1.10, GPM_LPS:0.06309};
+const SIZES = [50,75,100,150,200,250,300,400,500,600,800,1000];
+let rooms = [];
+const $ = id => document.getElementById(id);
+const fmt = (n,d=0) => n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+
+try { const s = JSON.parse(localStorage.getItem("chiller_rooms")||"[]"); if (Array.isArray(s)) rooms = s; } catch(e){}
+function save(){ try { localStorage.setItem("chiller_rooms", JSON.stringify(rooms)); } catch(e){} }
+
+function roomLoad(r){
+  return (r.area*K.AREA + r.glass*K.GLASS + r.people*K.PERSON + (r.light+r.equip)*K.W_BTU) * K.FRESH;
+}
+function selectChiller(tr){
+  const need = tr*K.MARGIN;
+  for (const s of SIZES) if (s >= need) return s;
+  return Math.ceil(need/100)*100;
+}
+const num = (id,def) => { const v = parseFloat($(id).value); return isNaN(v) ? def : v; };
+
+function render(){
+  const div = Math.min(1, Math.max(0.1, num("div",0.8)));
+  const sum = rooms.reduce((a,r)=>a+roomLoad(r),0);
+  const tr = sum*div/K.BTU_TR;
+  const chiller = rooms.length ? selectChiller(tr) : 0;
+
+  $("hTR").textContent = fmt(tr,1);
+  $("hCh").textContent = chiller ? fmt(chiller) : "–";
+
+  $("list").innerHTML = rooms.length
+    ? "<table><thead><tr><th>ห้อง</th><th>ตร.ม.</th><th>คน</th><th>BTU/hr</th><th>TR</th><th></th></tr></thead><tbody>" +
+      rooms.map((r,i)=>{ const b=roomLoad(r);
+        return `<tr><td>${esc(r.name)}</td><td class="num">${fmt(r.area,1)}</td><td class="num">${r.people}</td><td class="num">${fmt(b)}</td><td class="num">${fmt(b/K.BTU_TR,2)}</td><td><button class="x" data-i="${i}" aria-label="ลบห้อง ${esc(r.name)}">×</button></td></tr>`;
+      }).join("") + "</tbody></table>"
+    : '<p class="empty">ยังไม่มีห้อง เพิ่มห้องด้านบน หรือกดใส่ข้อมูลตัวอย่าง</p>';
+
+  const dt = Math.max(1,num("dt",10)), kwtr = parseFloat($("type").value);
+  const volt = Math.max(1,num("volt",380)), pf = Math.min(1,Math.max(0.1,num("pf",0.85)));
+  let rows;
+  if (!rooms.length){ rows = [["ผลรวมโหลดห้อง","0 BTU/hr"]]; }
+  else {
+    const gpm = chiller*24/dt, kw = chiller*kwtr, amp = kw*1000/(Math.sqrt(3)*volt*pf);
+    rows = [
+      ["ผลรวมโหลดห้อง", `<span class="num">${fmt(sum)}</span> BTU/hr`],
+      ["× Diversity ${div}", `<span class="num">${fmt(tr,2)}</span> TR`],
+      ["เผื่อ 10%", `<span class="num">${fmt(tr*K.MARGIN,2)}</span> TR`],
+      ["ชิลเลอร์ที่เลือก", `<span class="num big cool">${fmt(chiller)}</span> TR`],
+      ["น้ำเย็น", `<span class="num">${fmt(gpm)}</span> GPM (${fmt(gpm*K.GPM_LPS,1)} L/s)`],
+      ["กำลังไฟฟ้า", `<span class="num">${fmt(kw,1)}</span> kW`],
+      ["กระแสเต็มพิกัด (3 เฟส)", `<span class="num">${fmt(amp,1)}</span> A`]
+    ];
+  }
+  $("res").innerHTML = rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join("");
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+$("add").onclick = () => {
+  const r = {name:$("name").value.trim()||"ไม่ระบุชื่อ", area:num("area",NaN), glass:num("glass",0),
+             people:Math.round(num("people",0)), light:num("light",0), equip:num("equip",0)};
+  const err = $("err");
+  if (!(r.area>0)){ err.textContent="กรอกพื้นที่ห้องให้มากกว่า 0 ตร.ม."; err.hidden=false; $("area").focus(); return; }
+  if (r.glass<0||r.people<0||r.light<0||r.equip<0){ err.textContent="ค่าต้องไม่ติดลบ"; err.hidden=false; return; }
+  err.hidden = true;
+  rooms.push(r); save();
+  ["name","area","glass","people","light","equip"].forEach(id=>$(id).value="");
+  render();
+};
+$("demo").onclick = () => {
+  rooms = [
+    {name:"Office A",area:50,glass:10,people:8,light:800,equip:2000},
+    {name:"Office B",area:80,glass:20,people:15,light:1200,equip:3000},
+    {name:"Meeting",area:30,glass:5,people:10,light:400,equip:500},
+    {name:"Lobby",area:100,glass:40,people:20,light:1500,equip:1000}
+  ]; save(); render();
+};
+$("list").onclick = e => {
+  const b = e.target.closest("button[data-i]"); if(!b) return;
+  rooms.splice(+b.dataset.i,1); save(); render();
+};
+["div","dt","type","volt","pf"].forEach(id=>$(id).addEventListener("input",render));
+render();
+</script>
+</body>
+</html>
